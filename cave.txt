@@ -1,0 +1,189 @@
+// declare & function
+var timer=0
+var debuff_count=[0, 0, 0]
+var debuff_time=[0, 0, 0]
+var buff_count=[0, 0, 0]
+var buff_time=[0, 0, 0]
+>`0,0,mask:  @item.GetCooldown("mask")@
+>`0,1,blade: @item.GetCooldown("blade")@
+>`0,2,dash:  @item.GetCooldown("dash")@
+>`0,3,mind:  @item.GetCooldown("mind")@
+>`0,4,count: @foe.count@
+>`0,5,time: @totaltime@ timer: @timer@
+
+var oldtime=0
+var curtime=0
+var oldstate=0
+var curstate=0
+
+func FState()
+  ?foe.time-1!curtime
+    oldstate=curstate
+    oldtime=curtime
+  curtime=foe.time
+  curstate=foe.state
+  ?foe=boss
+    >`3,10,@curstate@:@curtime@
+    ^\n@oldstate@:@oldtime@
+
+FState()
+
+
+>( OWO
+
+// function
+func get_enemy()
+    debuff_count = [0, 0, 0]
+    debuff_time = [0, 0, 0]
+    ? foe.count > 0
+        var de_strs = []
+        de_strs = string.Split(foe.debuffs.string, ",")
+
+        ? de_strs.Count()>0
+            for i = 0..de_strs.Count()-1
+                var de_str = []
+                de_str = string.Split(de_strs[i], ":")
+
+                ? de_str.Count()=4
+                    var de_type = de_str[1]
+                    var de_count = de_str[2]
+                    var de_time = de_str[3]
+
+                    ? string.Equals(de_type, "debuff_damage")
+                        debuff_count[0]=int.Parse(de_count)
+                        debuff_time[0]=int.Parse(de_time)
+                    :? string.Equals(de_type, "debuff_chill")
+                        debuff_count[1]=int.Parse(de_count)
+                        debuff_time[1]=int.Parse(de_time)
+                    :? string.Equals(de_type, "debuff_dot")
+                        debuff_count[2]=int.Parse(de_count)
+                        debuff_time[2]=int.Parse(de_time)
+
+// a: poison / b: smite / c: X
+func get_player()
+    buff_count = [0, 0, 0]
+    buff_time = [0, 0, 0]
+    var de_strs = []
+    de_strs = string.Split(buffs.string, ",")
+
+    ? de_strs.Count()>0
+        for i = 0..de_strs.Count()-1
+            var de_str = []
+            de_str = string.Split(de_strs[i], ":")
+
+            ? de_str.Count()=4
+                var de_type = de_str[1]
+                var de_count = de_str[2]
+                var de_time = de_str[3]
+
+                ? string.Equals(de_type, "debuff_damage")
+                    buff_count[0]=int.Parse(de_count)
+                    buff_time[0]=int.Parse(de_time)
+                :? string.Equals(de_type, "smite")
+                    buff_count[1]=int.Parse(de_count)
+                    buff_time[1]=int.Parse(de_time)
+                :? string.Equals(de_type, "X")
+                    buff_count[2]=int.Parse(de_count)
+                    buff_time[2]=int.Parse(de_time)
+    return 1
+
+
+// a: poison / b: ice / c: fire / d: heal / e: armor
+// 0: not use / 1: wand / 2: sword
+func debuff_enemy(a, b, c, d, e, weapon)
+    equipR mask
+    get_enemy()
+    ? (a!0 & debuff_count[0]<1)
+        ? a=1
+            equipL poison wand
+        :
+            ? foe.distance>8
+                equipR dashing shield
+            equipL poison sword
+    :? (b!0 & debuff_count[1]<6)
+        ? b=1
+            equipL ice wand
+        :
+            ? foe.distance>8
+                equipR dashing shield
+            :
+                equipR mask
+            equipL ice sword
+    :? (c!0 & debuff_count[2]<1)
+        ? c=1
+            equipL fire wand
+        :
+            ? foe.distance>8
+                equipR dashing shield
+            equipL fire sword
+    :? (d!0 & hp<maxhp)
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR vigor sword 10* +10
+        equipL vigor sword 10* +11
+    :? (e!0 & foe.armor>0)
+        equipR fire hammer
+        equipL poison Hammer
+    :
+        equip @weapon@
+
+// init
+? totaltime<=30
+    timer=-300
+? loc.begin & loc.stars<=5
+    brew wood
+:? loc.begin & loc.stars>=11
+    brew wood+tar
+:? loc.begin
+    brew tar
+
+// no enemy
+? loc.stars<=5 & foe.distance<=25
+    activate potion
+? loc.stars>=11 & pos.x>=430
+    activate potion // cleansing potion
+? hp<15
+    activate potion
+
+? pickup.distance<15
+    equipR star
+:? foe.distance>18
+    equipR mask
+    equipL triskelion
+:? totaltime-timer<=30
+    equip bardiche
+
+// low star
+:? loc=Caves & loc.stars<=5 // farm at Cave 5*
+    ? foe.hp>80
+        equip repeating crossbow
+    :
+        equipR ice wand
+        equipL exp
+
+// blade
+:? foe.count>=math.Min(loc.stars, 8) & item.GetCooldown("blade")<=0
+    equip blade
+    ? item.CanActivate("blade")
+        activate R
+
+// special enemt
+:? foe=cool_bat
+    debuff_enemy(2, 2, 0, 0, 0, bardiche)
+    ? item.CanActivate("bardiche")
+        timer=totaltime
+        activate R
+
+// boss
+:? foe=spider_boss & get_player() & buff_count[0]=0 & foe.state=133 & foe.time>=15 & foe.time<=30
+    equip poison staff
+:? foe=spider_boss
+    debuff_enemy(1, 1, 0, 0, 0, repeating crossbow)
+
+// others boss
+:? buffs.count>=6
+    equipR ice wand
+    equipL poison wand
+:
+    equip repeating crossbow

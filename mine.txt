@@ -1,0 +1,146 @@
+var oldtime=0
+var curtime=0
+var oldstate=0
+var curstate=0
+
+func FState()
+  ?foe.time-1!curtime
+    oldstate=curstate
+    oldtime=curtime
+  curtime=foe.time
+  curstate=foe.state
+  ?foe=boss
+    >`3,10,@curstate@:@curtime@
+    ^\n@oldstate@:@oldtime@
+
+FState()
+
+
+>`0,0,mask:  @item.GetCooldown("mask")@
+>`0,1,blade: @item.GetCooldown("blade")@
+>`0,2,dash:  @item.GetCooldown("dash")@
+>`0,3,mind:  @item.GetCooldown("mind")@
+>`0,4,count: @foe.count@ find: @find_enemy@
+>`0,5,time: @totaltime@
+
+// declare & function
+var find_enemy
+var debuff_count=[] // poison / ice / fire
+var debuff_time=[]
+
+// init
+? totaltime<30
+    find_enemy=0
+
+// function
+func get_data()
+    debuff_count = [0, 0, 0]
+    debuff_time = [0, 0, 0]
+    ? foe.count > 0
+        var de_strs = []
+        de_strs = string.Split(foe.debuffs.string, ",")
+
+        ? de_strs.Count()>0
+            for i = 0..de_strs.Count()-1
+                var de_str = []
+                de_str = string.Split(de_strs[i], ":")
+
+                ? de_str.Count()=4
+                    var de_type = de_str[1]
+                    var de_count = de_str[2]
+                    var de_time = de_str[3]
+
+                    ? string.Equals(de_type, "debuff_damage")
+                        debuff_count[0]=int.Parse(de_count)
+                        debuff_time[0]=int.Parse(de_time)
+                    :? string.Equals(de_type, "debuff_chill")
+                        debuff_count[1]=int.Parse(de_count)
+                        debuff_time[1]=int.Parse(de_time)
+                    :? string.Equals(de_type, "debuff_dot")
+                        debuff_count[2]=int.Parse(de_count)
+                        debuff_time[2]=int.Parse(de_time)
+
+
+// a: poison / b: ice / c: fire
+// 0: not use / 1: wand / 2: sword
+// weapon: main attack weapon
+func debuff_enemy(a, b, c, weapon)
+    equipR mask
+    get_data()
+    ? (a!0 & (debuff_count[0]<1) | (debuff_count[0]>0 & debuff_time[0]<15))
+        ? a=1
+            equipL poison wand
+        :
+            ? foe.distance>8
+                equipR dashing shield
+            equipL poison sword
+    :? (b!0 & (debuff_count[1]<6) | (debuff_count[1]>0 & debuff_time[1]<15))
+        ? b=1
+            equipL ice wand
+        :
+            ? foe.distance>8
+                equipR dashing shield
+            :
+                equipR mask
+            equipL ice sword
+    :? (c!0 & (debuff_count[2]<1) | (debuff_count[2]>0 & debuff_time[2]<15))
+        ? c=1
+            equipL fire wand
+        :
+            ? foe.distance>8
+                equipR dashing shield
+            equipL fire sword
+    :
+        equip @weapon@
+
+// potion
+? loc.begin & loc=Mine & loc.stars>=11
+    brew stone
+:? loc.begin
+    brew tar
+
+?hp<7
+    activate potion
+
+// no enemy
+? pickup.distance<15
+    equipR star
+:? foe.distance>22
+    equipR mask
+    equipL triskelion
+
+// blade
+:? foe.count>=math.Min(loc.stars, 10) & item.GetCooldown("blade")<=0
+    equip blade
+    ? item.CanActivate("blade")
+        activate R
+
+// find special enemy
+:? (foe=fire_elemental)
+    equipR ice wand
+    equipL poison wand
+:? (foe=bomb_cart)
+    equip repeating crossbow
+
+// boss
+:? foe=bronze_guardian & find_enemy=0 & foe.state=33
+    activate potion
+    find_enemy=1
+:? foe=bronze_guardian & foe.armor>0 & foe.state=33
+    ? foe.distance>8
+        equipR dashing shield
+    :
+        equipR poison hammer
+    equipL fire hammer
+:? foe=bronze_guardian & foe.state=32 & foe.time>30
+    equipR mind
+    activate R
+:? foe=bronze_guardian
+    debuff_enemy(0, 0, 1, aether crossbow)
+
+// others enemy
+:? buffs.count>=math.Min(loc.stars, 10)
+    equipR ice wand
+    equipL poison wand
+:
+    equip repeating crossbow

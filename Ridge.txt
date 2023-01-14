@@ -1,0 +1,129 @@
+import Cosmetics/WavyScarf
+
+var oldtime=0
+var curtime=0
+var oldstate=0
+var curstate=0
+
+func FState()
+    ?foe.time-1!curtime
+        oldstate=curstate
+        oldtime=curtime
+    curtime=foe.time
+    curstate=foe.state
+    ?foe=boss
+        >`3,10,@curstate@:@curtime@
+        ^\n@oldstate@:@oldtime@
+
+FState()
+
+// declare & function
+var find_enemy
+var timer=0
+var pre_enemy_count=0
+var debuff_count=[] // poison / ice / fire
+var debuff_time=[]
+
+// init
+? totaltime<=1
+    find_enemy=0
+    timer=0
+    pre_enemy_count=0
+
+>`0,1,foe="@foe.name@"
+>`0,2,count: @foe.count@ pre: @pre_enemy_count@
+
+// function
+func get_data()
+    debuff_count = [0, 0, 0]
+    debuff_time = [0, 0, 0]
+    ? foe.count > 0
+        var de_strs = []
+        de_strs = string.Split(foe.debuffs.string, ",")
+
+        ? de_strs.Count()>0
+            for i = 0..de_strs.Count()-1
+                var de_str = []
+                de_str = string.Split(de_strs[i], ":")
+
+                ? de_str.Count()=4
+                    var de_type = de_str[1]
+                    var de_count = de_str[2]
+                    var de_time = de_str[3]
+
+                    ? string.Equals(de_type, "debuff_damage")
+                        debuff_count[0]=int.Parse(de_count)
+                        debuff_time[0]=int.Parse(de_time)
+                    :? string.Equals(de_type, "debuff_chill")
+                        debuff_count[1]=int.Parse(de_count)
+                        debuff_time[1]=int.Parse(de_time)
+                    :? string.Equals(de_type, "debuff_dot")
+                        debuff_count[2]=int.Parse(de_count)
+                        debuff_time[2]=int.Parse(de_time)
+
+// a: poison / b: ice / c: fire
+// 0: not use / 1: wand / 2: sword
+// weapon: main attack weapon
+func debuff_enemy()
+    get_data()
+    equipR mask
+    ? foe.distance>15
+        equipR dashing shield
+    ? debuff_count［1］<6 | debuff_time［1］<15
+        equipL ice sword
+    :? hp<maxhp
+        equipR vigor sword 10* +10
+        equipL vigor sword 10* +11
+    :
+        equipR fire sword 10*
+        equipL fire sword 9*
+
+// potion
+? loc.begin
+    brew tar
+? hp<7
+    activate potion
+
+// no enemy
+? totaltime-timer<=10
+    equip bardiche
+:? pickup.distance<15
+    equipR star
+:? foe.distance>23
+    equipR mask
+    equipL triskelion
+
+// find special enemy
+:? foe!boss
+    ? foe=ki_eater | foe=ki_globbler | foe=ki_slerper
+        ? foe.count<pre_enemy_count
+            pre_enemy_count=foe.count
+        ? foe.count-2>pre_enemy_count
+            pre_enemy_count=foe.count
+            equip fire staff A
+        :
+            equipR poison wand
+            equipL aether wand 8*
+    :? foe=ice_pillar
+        equipR aether wand 9*
+        equipL aether wand 8*
+    :? foe=ice_wall
+        equipL aether wand
+        equipR ice wand
+    :
+        equip repeating crossbow
+
+// boss
+:? foe=boss
+    ? foe=ice_elemental_elite & foe=boss
+        ? foe.distance>15
+            equipR dashing shield
+        :
+            equip bardiche
+            ? item.CanActivate("bardiche") & item.GetCooldown("bardiche")<=0
+                timer=totaltime
+                activate R
+    :? foe=yeti & foe.state=32 & foe.time>=60
+        equipR vigor shield
+    :? foe=yeti
+        debuff_enemy()

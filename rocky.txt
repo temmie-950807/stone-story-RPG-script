@@ -1,0 +1,128 @@
+// declare & function
+var atk_time=0
+var potion_use=0
+var debuff_count=[] // poison / ice / fire
+var debuff_time=[]
+
+// function
+func get_data()
+    debuff_count = [0, 0, 0]
+    debuff_time = [0, 0, 0]
+    ? foe.count > 0
+        var de_strs = []
+        de_strs = string.Split(foe.debuffs.string, ",")
+
+        ? de_strs.Count()>0
+            for i = 0..de_strs.Count()-1
+                var de_str = []
+                de_str = string.Split(de_strs[i], ":")
+
+                ? de_str.Count()=4
+                    var de_type = de_str[1]
+                    var de_count = de_str[2]
+                    var de_time = de_str[3]
+
+                    ? string.Equals(de_type, "debuff_damage")
+                        debuff_count[0]=int.Parse(de_count)
+                        debuff_time[0]=int.Parse(de_time)
+                    :? string.Equals(de_type, "debuff_chill")
+                        debuff_count[1]=int.Parse(de_count)
+                        debuff_time[1]=int.Parse(de_time)
+                    :? string.Equals(de_type, "debuff_dot")
+                        debuff_count[2]=int.Parse(de_count)
+                        debuff_time[2]=int.Parse(de_time)
+
+func dash(weapon)
+    ? foe.distance>8 & item.GetCooldown("bash")<=0
+        equipR bashing shield
+    :? foe.distance>8 & item.GetCooldown("dash")<=0
+        equipR dashing shield
+    :? string.Equals(weapon, "")=false
+        equipR @weapon@
+
+// a: poison / b: ice / c: fire / d: heal / e: armor
+// 0: not use / 1: wand / 2: sword
+func debuff_enemy(a, b, c, d, weapon1, weapon2)
+    get_data()
+    ? (a!0 & (debuff_count[0]<1 | debuff_time[0]<15))
+        dash("mask")
+        equipL poison sword
+    :? (b!0 & (debuff_count[1]<6 | debuff_time[1]<15))
+        dash("mask")
+        equipL ice sword
+    :? (c!0 & buffs.count=0 & hp<maxhp)
+        dash("vigor sword 10* +13")
+        equipL vigor sword 10* +10
+    :? (d!0 & foe.armor>0)
+        dash("fire hammer")
+        equipL poison hammer
+    :? string.Size(weapon1)!0 & string.Size(weapon2)=0
+        equip @weapon1@
+    :? string.Size(weapon1)!0 & string.Size(weapon2)!0
+        equipR @weapon1@
+        equipL @weapon2@
+
+// init
+? totaltime<=30
+    atk_time=0
+    potion_use=0
+
+// potion
+? loc.begin
+    brew stone+bronze
+
+// no enemy
+? pickup.distance<15
+    equipR star
+:? foe.distance>22
+    equipR mask
+    equipL triskelion
+
+// boss
+:? foe=dysangelos_bearer
+    ? foe.state=32 & foe.time>=60
+        equip poison staff ap
+    :
+        debuff_enemy(2, 2, 1, 0, "fire sword 10* +16", "fire sword 10* +14")
+:? foe=dysangelos_elementalist
+    ? (debuff_count[0]<1 | debuff_count[1]<6) & foe!immune_to_debuff_damage & foe.state!32
+        debuff_enemy(2, 2, 0, 0, "", "")
+    :? foe=fire
+        dash("aether sword +6")
+        equipL aether sword +5
+    :? foe=aether
+        dash("vigor sword +13")
+        equipL vigor sword +10
+    :? foe=vigor
+        dash("poison wand")
+        equipL poison sword
+    :? foe=poison
+        dash("ice wand")
+        equipL ice sword
+    :? foe=ice
+        dash("fire sword +16")
+        equipL fire sword +14
+:? foe=dysangelos_perfected
+    ? debuff_count[0]=1 & debuff_count[1]=6 & buffs.count>0 & ((loc.stars<=10 & potion_use=0) | (loc.stars>10 & potion_use=0 & foe.state=110))
+        potion_use=1
+        activate potion
+    :? foe.state=32
+        ? atk_time%5=3 & foe.time>=60
+            equipR mind
+            activate R
+        :? atk_time%5!3 & foe.time>=85
+            equip poison staff ap
+        :? foe.time=1
+            atk_time++
+    :? foe.state=115 & foe.time>=75
+        equipR mind
+        activate R
+    :? buffs.count>0
+        dash("fire sword 10* +16")
+        equipL fire sword 9* +14
+    :
+        debuff_enemy(2, 2, 1, 1, "fire sword 10* +16", "fire sword 10* +14")
+
+// others boss
+:? foe=boss & foe.distance<25
+    debuff_enemy(2, 2, 0, 0, repeating crossbow, "")

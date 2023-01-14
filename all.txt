@@ -1,0 +1,357 @@
+// declare & function
+var find_enemy
+var timer=0
+var cnt=0
+var debuff_count=[] // poison / ice / fire
+var debuff_time=[]
+
+// init
+? totaltime<30
+    find_enemy=0
+
+// function
+func get_data()
+    debuff_count = [0, 0, 0]
+    debuff_time = [0, 0, 0]
+    ? foe.count > 0
+        var de_strs = []
+        de_strs = string.Split(foe.debuffs.string, ",")
+
+        ? de_strs.Count()>0
+            for i = 0..de_strs.Count()-1
+                var de_str = []
+                de_str = string.Split(de_strs[i], ":")
+
+                ? de_str.Count()=4
+                    var de_type = de_str[1]
+                    var de_count = de_str[2]
+                    var de_time = de_str[3]
+
+                    ? string.Equals(de_type, "debuff_damage")
+                        debuff_count[0]=int.Parse(de_count)
+                        debuff_time[0]=int.Parse(de_time)
+                    :? string.Equals(de_type, "debuff_chill")
+                        debuff_count[1]=int.Parse(de_count)
+                        debuff_time[1]=int.Parse(de_time)
+                    :? string.Equals(de_type, "debuff_dot")
+                        debuff_count[2]=int.Parse(de_count)
+                        debuff_time[2]=int.Parse(de_time)
+
+// a: poison / b: ice / c: fire
+// 0: not use / 1: wand / 2: sword
+// weapon: main attack weapon
+func debuff_enemy(a, b, c, weapon)
+    equipR mask
+    get_data()
+    ? (a!0 & (debuff_count[0]<1) | (debuff_count[0]>0 & debuff_time[0]<15))
+        ? a=1
+            equipL poison wand
+        :
+            ? foe.distance>8
+                equipR dashing shield
+            equipL poison sword
+    :? (b!0 & (debuff_count[1]<6) | (debuff_count[1]>0 & debuff_time[1]<15))
+        ? b=1
+            equipL ice wand
+        :
+            ? foe.distance>8
+                equipR dashing shield
+            :
+                equipR mask
+            equipL ice sword
+    :? (c!0 & (debuff_count[2]<1) | (debuff_count[2]>0 & debuff_time[2]<15))
+        ? c=1
+            equipL fire wand
+        :
+            ? foe.distance>8
+                equipR dashing shield
+            equipL fire sword
+    :
+        equip @weapon@
+
+// potion
+? loc.begin & (loc=Caves | loc=Deadwood) & loc.stars<=5
+    brew wood
+:? loc.begin & loc=Caves & loc.stars>=11
+    brew wood+tar
+:? loc.begin & loc=Mushroom & loc.stars>=11
+    brew wood+tar
+:? loc.begin & loc=Mine & loc.stars>=11
+    brew stone
+:
+    brew tar
+
+? (loc=Caves | loc=Deadwood) & loc.stars<=5 & foe.distance<30
+    activate potion
+:?hp<7
+    activate potion
+
+// no enemy
+? pickup.distance<15
+    equipR star
+:? foe.distance>30 & (foe=boss & foe=ghost_tomb)
+    equipR mask
+    equipL triskelion
+:? foe.distance>15 & (loc=Mushroom & loc.stars<=10 & foe!boss)
+    equipR mask
+    equipL triskelion
+:? foe.distance>22
+    equipR mask
+    equipL triskelion
+
+// locate
+:? (loc=Deadwood & loc.stars<=5) // farm at Deadwood 5*
+    ? foe=scarab & foe.distance<10
+        equip bardiche
+    :? foe=boss
+        equip repeating crossbow
+    :? (foe=mosquito | foe=huge_mosquito) & foe.distance<15
+        equipR poison wand
+        equipL exp
+    :
+        equipR mask
+        equipL triskelion
+:? (loc=Caves & loc.stars<=5) // farm at Cave 5*
+    ? foe.hp>80
+        equip repeating crossbow
+    :
+        equipR poison wand
+        equipL exp
+:? (loc=Mushroom & loc.stars<=10 & foe!boss)
+    ? foe.distance>10 & item.GetCooldown("dash")<=0
+        equipR dashing shield
+        equipL quest
+        timer=time
+    :? time-timer<5
+        equip poison staff A
+    :
+        equip bardiche
+
+// find special enemy
+:? loc.stars>5 & (foe=scarab)
+    equip bardiche
+:? (foe=cool_bat)
+    debuff_enemy(2, 2, 0, bardiche)
+    ? item.CanActivate("bardiche")
+        activate R
+:? loc=Mushroom & (foe=boss & foe!mushroom_boss & foe!mushroom_boss_fat & foe!mushroom_boss_skinny) // Mr.puff
+    equipR mask
+    get_data()
+    ? foe=fluff & foe.distance<10
+        equipL mind
+    :? ((debuff_count[0]<1) | (debuff_count[0]>0 & debuff_time[0]<15))
+        equipL poison wand
+    :? ((debuff_count[1]<6) | (debuff_count[1]>0 & debuff_time[1]<15))
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR ice sword
+        equipL ice wand
+    :
+        equip bardiche
+:? (foe=ghost | foe=large_ghost)
+    equipR ice wand
+    equipL aether wand
+:? find_enemy | (foe=boss & foe=ghost_tomb)
+    find_enemy=1
+    ? foe.distance>8
+        equipR dashing shield
+    :
+        equip repeating crossbow
+:? (foe=bomb_cart)
+    equip repeating crossbow
+:? (foe=ki_eater | foe=ki_globbler | foe=ki_slerper)
+    ? foe.distance>15   
+        equipR ice wand
+        equipL fire wand
+    :
+        equip repeating crossbow
+:? (foe=ice_pillar)
+    equipR aether wand 9*
+    equipL aether wand 8*
+:? (foe=ice_wall)
+    equipL aether wand
+    equipR ice wand
+:? loc=Ridge & (foe=boss & foe!yeti)
+    equip repeating crossbow
+:? (foe=cult_guard)
+    equip bardiche
+
+// boss
+:? foe=boss & foe.distance>30
+    equipR bashing shield
+    activate R
+:? foe=tree_boss & foe.distance<25 & loc.stars<=7
+    equip repeating crossbow
+:? foe=tree_boss & foe.distance<25 & loc.stars>7
+    debuff_enemy(2, 2, 0, repeating crossbow)
+:? foe=poena & foe.state=32 & foe.time>30
+    equipR mind
+    activate R
+:? foe=poena
+    equip repeating crossbow
+:? foe=spider_boss & foe.distance<25
+    ? loc.stars>=11
+        activate potion // cleansing potion
+    debuff_enemy(1, 1, 0, repeating crossbow)
+:? foe=mushroom_boss & !(foe=mushroom_boss_fat | foe=mushroom_boss_skinny) & foe.distance<25
+    equipR mask
+    get_data()
+    ? ((debuff_count[0]<1) | (debuff_count[0]>0 & debuff_time[0]<15))
+        equipL poison wand
+    :? ((debuff_count[1]<6) | (debuff_count[1]>0 & debuff_time[1]<15))
+        equipL ice sword
+    :? foe.armor>0
+        equipR hammer 10* +6
+        equipL hammer 10* +2
+    :
+        equip repeating crossbow
+:? (foe=mushroom_boss_fat | foe=mushroom_boss_skinny) & foe.distance<25
+    ? foe.distance>8
+        equipR dashing shield
+    :? foe.armor>0
+        equipR hammer 10* +6
+    :
+        equipR vigor sword 9*
+    
+    ? foe.armor>0
+        equipL hammer 10* +6
+    :
+        equipL vigor sword 10*
+:? foe=skeleton_boss & foe.state=32 & foe.time>105 & loc.stars>7
+    equipR mind
+    activate R
+:? (foe=skeleton_boss | foe=skeleton_boss_stage_2) & loc.stars>7
+    debuff_enemy(1, 1, 0, repeating crossbow)
+:? foe=skeleton_boss & loc.stars<=7
+    equip repeating crossbow
+:? foe=bronze_guardian & foe.state=32 & foe.time>30
+    equipR mind
+    activate R
+:? foe=bronze_guardian & foe.state=33
+    ? foe.distance>8
+        equipR dashing shield
+    :
+        equipR stone hammer
+    equipL fire hammer
+:? foe=bronze_guardian & foe.distance<25
+    debuff_enemy(0, 0, 1, repeating crossbow)
+:? foe=bronze_guardian & foe.armor<=0 & foe.distance<25
+    debuff_enemy(0, 1, 1, repeating crossbow)
+:? foe=yeti
+    get_data()
+    ? ((debuff_count[1]<6) | (debuff_count[1]>0 & debuff_time[1]<15))
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR mask
+        equipL ice sword
+    :? ((debuff_count[2]<1) | (debuff_count[2]>0 & debuff_time[2]<15))
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR mask
+        equipL fire wand
+    :? hp<maxhp
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR vigor sword 9*
+        equipL vigor sword 10*
+    :
+        equip repeating crossbow
+:? foe=nagaraja & foe.distance<25
+    ? hp<20
+        activate potion
+    equipR mask
+    get_data()
+    ? ((debuff_count[0]<1) | (debuff_count[0]>0 & debuff_time[0]<15))
+        equipL poison sword
+    :? ((debuff_count[1]<6) | (debuff_count[1]>0 & debuff_time[1]<15))
+        equipL ice sword
+    :? ((debuff_count[2]<1) | (debuff_count[2]>0 & debuff_time[2]<15))
+        equipL fire sword
+    :? debuffs.count>2
+        equip bardiche
+        var cd=item.GetCooldown("bardiche")
+        ? cd<=0
+            activate R
+    :
+        equip repeating crossbow
+:? foe=dysangelos & (foe=phase1 | foe=phase3) & foe.distance<25
+    equipR mask
+    get_data()
+    ? ((debuff_count[0]<1) | (debuff_count[0]>0 & debuff_time[0]<15))
+        equipL poison wand
+    :? ((debuff_count[1]<6) | (debuff_count[1]>0 & debuff_time[1]<15))
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR mask
+        equipL ice sword
+    :? ((debuff_count[2]<1) | (debuff_count[2]>0 & debuff_time[2]<15))
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR mask
+        equipL fire sword
+    :? hp<maxhp
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR mask
+        equipR vigor sword 9*
+        equipL vigor sword 10*
+    :? foe.armor>0
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR mask
+        equipR fire hammer
+        equipL stones hammer
+    :
+        equip repeating crossbow
+:? foe=dysangelos & foe=phase2 & foe.distance<25
+    ? foe=fire
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR aether wand
+        equipL aether sword
+    :? foe=aether
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR vigor sword 9*
+        equipL vigor sword 10*
+    :? foe=vigor
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR poison wand
+        equipL poison sword
+    :? foe=poison
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR ice wand
+        equipL ice sword
+    :? foe=ice
+        ? foe.distance>8
+            equipR dashing shield
+        :
+            equipR fire hammer
+        equipL fire sword
+
+    ? hp<35
+        equipR vigor sword 10*
+
+// others boss
+:? foe=boss & foe.distance<25
+    debuff_enemy(1, 1, 1, repeating crossbow)
+
+// others enemy
+:? debuffs.count>2
+    equip bardiche
+:       
+    equip repeating crossbow
