@@ -1,3 +1,21 @@
+var oldtime=0
+var curtime=0
+var oldstate=0
+var curstate=0
+
+func FState()
+  ?foe.time-1!curtime
+    oldstate=curstate
+    oldtime=curtime
+  curtime=foe.time
+  curstate=foe.state
+  ?foe=boss
+    >`3,10,@curstate@:@curtime@
+    ^\n@oldstate@:@oldtime@
+
+FState()
+
+
 // declare & function
 var find_enemy
 var timer=0

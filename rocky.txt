@@ -1,8 +1,31 @@
+var oldtime=0
+var curtime=0
+var oldstate=0
+var curstate=0
+
+func FState()
+  ?foe.time-1!curtime
+    oldstate=curstate
+    oldtime=curtime
+  curtime=foe.time
+  curstate=foe.state
+  ?foe=boss
+    >`3,10,@curstate@:@curtime@
+    ^\n@oldstate@:@oldtime@
+
+FState()
+
+
 // declare & function
-var atk_time=0
-var potion_use=0
+var atk_time
+var potion_use
+var timer
 var debuff_count=[] // poison / ice / fire
 var debuff_time=[]
+
+>distance: @foe.distance@
+>`0,1,timer: @timer@ total: @totaltime@
+>`0,2,atk: @atk_time@
 
 // function
 func get_data()
@@ -18,43 +41,37 @@ func get_data()
                 de_str = string.Split(de_strs[i], ":")
 
                 ? de_str.Count()=4
-                    var de_type = de_str[1]
-                    var de_count = de_str[2]
-                    var de_time = de_str[3]
+                    ? string.Equals(de_str[1], "debuff_damage")
+                        debuff_count[0]=int.Parse(de_str[2])
+                        debuff_time[0]=int.Parse(de_str[3])
+                    :? string.Equals(de_str[1], "debuff_chill")
+                        debuff_count[1]=int.Parse(de_str[2])
+                        debuff_time[1]=int.Parse(de_str[3])
+                    :? string.Equals(de_str[1], "debuff_dot")
+                        debuff_count[2]=int.Parse(de_str[2])
+                        debuff_time[2]=int.Parse(de_str[3])
 
-                    ? string.Equals(de_type, "debuff_damage")
-                        debuff_count[0]=int.Parse(de_count)
-                        debuff_time[0]=int.Parse(de_time)
-                    :? string.Equals(de_type, "debuff_chill")
-                        debuff_count[1]=int.Parse(de_count)
-                        debuff_time[1]=int.Parse(de_time)
-                    :? string.Equals(de_type, "debuff_dot")
-                        debuff_count[2]=int.Parse(de_count)
-                        debuff_time[2]=int.Parse(de_time)
-
-func dash(weapon)
-    ? foe.distance>8 & item.GetCooldown("bash")<=0
-        equipR bashing shield
-    :? foe.distance>8 & item.GetCooldown("dash")<=0
-        equipR dashing shield
-    :? string.Equals(weapon, "")=false
-        equipR @weapon@
-
-// a: poison / b: ice / c: fire / d: heal / e: armor
-// 0: not use / 1: wand / 2: sword
+// a: poison / b: ice / c: heal / d: armor
 func debuff_enemy(a, b, c, d, weapon1, weapon2)
     get_data()
-    ? (a!0 & (debuff_count[0]<1 | debuff_time[0]<15))
-        dash("mask")
+
+    ? foe.distance>8 & item.GetCooldown("bash")<=0
+        equipR bashing shield
+        equipL fire sword
+    :? foe.distance>8 & item.GetCooldown("dash")<=0
+        equipR dashing shield
+        equipL fire sword
+    :? a!0 & (debuff_count[0]<1 | debuff_time[0]<15)
+        equipR mask
         equipL poison sword
-    :? (b!0 & (debuff_count[1]<6 | debuff_time[1]<15))
-        dash("mask")
+    :? b!0 & (debuff_count[1]<6 | debuff_time[1]<15)
+        equipR mask
         equipL ice sword
     :? (c!0 & buffs.count=0 & hp<maxhp)
-        dash("vigor sword 10* +13")
-        equipL vigor sword 10* +10
+        equipR vigor sword +13
+        equipL vigor sword +10
     :? (d!0 & foe.armor>0)
-        dash("fire hammer")
+        equipR fire hammer
         equipL poison hammer
     :? string.Size(weapon1)!0 & string.Size(weapon2)=0
         equip @weapon1@
@@ -66,6 +83,7 @@ func debuff_enemy(a, b, c, d, weapon1, weapon2)
 ? totaltime<=30
     atk_time=0
     potion_use=0
+    timer=0
 
 // potion
 ? loc.begin
@@ -83,46 +101,51 @@ func debuff_enemy(a, b, c, d, weapon1, weapon2)
     ? foe.state=32 & foe.time>=60
         equip poison staff ap
     :
-        debuff_enemy(2, 2, 1, 0, "fire sword 10* +16", "fire sword 10* +14")
+        debuff_enemy(1, 1, 1, 0, "fire sword 10* +16", "fire sword 10* +14")
 :? foe=dysangelos_elementalist
-    ? (debuff_count[0]<1 | debuff_count[1]<6) & foe!immune_to_debuff_damage & foe.state!32
-        debuff_enemy(2, 2, 0, 0, "", "")
+    ? foe.distance>8 & item.GetCooldown("bash")<=0
+        equipR bashing shield
+        equipL fire sword
+    :? foe.distance>8 & item.GetCooldown("dash")<=0
+        equipR dashing shield
+        equipL fire sword
     :? foe=fire
-        dash("aether sword +6")
-        equipL aether sword +5
+        equipR aether sword +9
+        equipL aether sword +7
     :? foe=aether
-        dash("vigor sword +13")
+        equipR vigor sword +13
         equipL vigor sword +10
     :? foe=vigor
-        dash("poison wand")
-        equipL poison sword
+        equipR poison sword +9
+        equipL poison sword +7
     :? foe=poison
-        dash("ice wand")
-        equipL ice sword
+        equipR ice sword +13
+        equipL ice sword +8
     :? foe=ice
-        dash("fire sword +16")
+        equipR fire sword +16
         equipL fire sword +14
 :? foe=dysangelos_perfected
     ? debuff_count[0]=1 & debuff_count[1]=6 & buffs.count>0 & ((loc.stars<=10 & potion_use=0) | (loc.stars>10 & potion_use=0 & foe.state=110))
         potion_use=1
         activate potion
-    :? foe.state=32
-        ? atk_time%5=3 & foe.time>=60
-            equipR mind
-            activate R
-        :? atk_time%5!3 & foe.time>=85
-            equip poison staff ap
-        :? foe.time=1
-            atk_time++
+    :? foe.state=32 & atk_time%5=3 & foe.time>=50
+        timer=totaltime
+        equipR mind
+        activate R
+    :? foe.state=32 & atk_time%5!3 & foe.time>=80
+        equip poison staff ap
+    :? foe.state=32 & foe.time=1
+        atk_time++
     :? foe.state=115 & foe.time>=75
+        timer=totaltime
         equipR mind
         activate R
     :? buffs.count>0
-        dash("fire sword 10* +16")
-        equipL fire sword 9* +14
+        equipR fire sword +16
+        equipL fire sword +14
     :
-        debuff_enemy(2, 2, 1, 1, "fire sword 10* +16", "fire sword 10* +14")
+        debuff_enemy(1, 1, 1, 1, "fire sword +16", "fire sword +14")
 
 // others boss
 :? foe=boss & foe.distance<25
-    debuff_enemy(2, 2, 0, 0, repeating crossbow, "")
+    debuff_enemy(1, 1, 0, 0, repeating crossbow, "")
